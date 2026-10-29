@@ -1,4 +1,4 @@
-
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -45,13 +45,20 @@ def register_user(
         email=str(data.email).lower(),
         hashed_password=hash_password(data.password),
     )
-
     db.add(user)
 
     try:
         db.commit()
         db.refresh(user)
-    except Exception:
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This email is already registered",
+        )
+
+    except SQLAlchemyError:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -59,7 +66,6 @@ def register_user(
         )
 
     return user
-
 
 @router.post("/login", response_model=TokenResponse)
 def login_user(
