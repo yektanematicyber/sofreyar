@@ -10,7 +10,7 @@ from app.auth import (
 )
 from app.database import get_db
 from app.models import User
-from app.schemas import (
+from app.schemas.auth import (
     TokenResponse,
     UserLogin,
     UserRegister,
