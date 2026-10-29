@@ -1,10 +1,11 @@
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from app.database import Base, engine
 from app import models
-from app.routers.auth import router as auth_router
+from app.routers import auth, ingredients, pantry
 
 
 @asynccontextmanager
@@ -21,8 +22,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(auth_router)
-
+app.include_router(auth.router)
+app.include_router(ingredients.router)
+app.include_router(pantry.router)
 
 
 @app.get("/")
@@ -33,4 +35,3 @@ def home():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-
