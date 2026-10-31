@@ -1,5 +1,7 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -36,15 +38,24 @@ def add_item(
 
 @router.get("", response_model=list[PantryItemOut])
 def list_items(
+    sort: Literal["id", "expiry"] = Query(
+        default="id",
+        description="id: به ترتیب افزودن | expiry: نزدیک‌ترین تاریخ انقضا اول",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return (
-        db.query(PantryItem)
-        .filter(PantryItem.user_id == current_user.id)
-        .order_by(PantryItem.id)
-        .all()
-    )
+    query = db.query(PantryItem).filter(PantryItem.user_id == current_user.id)
+
+    if sort == "expiry":
+        query = query.order_by(
+            PantryItem.expiry_date.asc().nulls_last(),
+            PantryItem.id,
+        )
+    else:
+        query = query.order_by(PantryItem.id)
+
+    return query.all()
 
 
 def get_user_item(
