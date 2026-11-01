@@ -1,34 +1,34 @@
-\# Safreyar API Contract
+﻿# Safreyar API Contract
 
 
 
-\*\*Project:\*\* Safreyar  
+**Project:** Safreyar  
 
-\*\*Backend:\*\* FastAPI + PostgreSQL  
+**Backend:** FastAPI + PostgreSQL  
 
-\*\*Frontend:\*\* Kotlin  
+**Frontend:** Kotlin  
 
-\*\*API Base URL (Local):\*\* `http://127.0.0.1:8001`
-
-
-
-\---
+**API Base URL (Local):** `http://127.0.0.1:8001`
 
 
 
-\## 1. Authentication
+---
 
 
 
-\### 1.1 Register
+## 1. Authentication
 
 
 
-\*\*Endpoint:\*\* `POST /auth/register`  
+### 1.1 Register
 
-\*\*Authentication:\*\* Not required  
 
-\*\*Success Status:\*\* `201 Created`
+
+**Endpoint:** `POST /auth/register`  
+
+**Authentication:** Not required  
+
+**Success Status:** `201 Created`
 
 
 
@@ -40,15 +40,15 @@ Request Body:
 
 {
 
-&#x20; "first\_name": "Ali",
+  "first_name": "Ali",
 
-&#x20; "last\_name": "Ahmadi",
+  "last_name": "Ahmadi",
 
-&#x20; "email": "ali@example.com",
+  "email": "ali@example.com",
 
-&#x20; "password": "Password123",
+  "password": "Password123",
 
-&#x20; "confirm\_password": "Password123"
+  "confirm_password": "Password123"
 
 }
 
@@ -64,13 +64,13 @@ Success Response:
 
 {
 
-&#x20; "id": 1,
+  "id": 1,
 
-&#x20; "first\_name": "Ali",
+  "first_name": "Ali",
 
-&#x20; "last\_name": "Ahmadi",
+  "last_name": "Ahmadi",
 
-&#x20; "email": "ali@example.com"
+  "email": "ali@example.com"
 
 }
 
@@ -80,21 +80,21 @@ Success Response:
 
 Possible Errors:
 
-\- `409 Conflict`: Email already registered.
+- `409 Conflict`: Email already registered.
 
-\- `422 Unprocessable Entity`: Invalid input.
-
-
-
-\### 1.2 Login
+- `422 Unprocessable Entity`: Invalid input.
 
 
 
-\*\*Endpoint:\*\* `POST /auth/login`  
+### 1.2 Login
 
-\*\*Authentication:\*\* Not required  
 
-\*\*Success Status:\*\* `200 OK`
+
+**Endpoint:** `POST /auth/login`  
+
+**Authentication:** Not required  
+
+**Success Status:** `200 OK`
 
 
 
@@ -106,9 +106,9 @@ Request Body:
 
 {
 
-&#x20; "email": "ali@example.com",
+  "email": "ali@example.com",
 
-&#x20; "password": "Password123"
+  "password": "Password123"
 
 }
 
@@ -124,9 +124,9 @@ Success Response:
 
 {
 
-&#x20; "access\_token": "JWT\_TOKEN",
+  "access_token": "JWT_TOKEN",
 
-&#x20; "token\_type": "bearer"
+  "token_type": "bearer"
 
 }
 
@@ -136,23 +136,23 @@ Success Response:
 
 Possible Errors:
 
-\- `401 Unauthorized`: Incorrect email or password.
+- `401 Unauthorized`: Incorrect email or password.
 
-\- `422 Unprocessable Entity`: Invalid input.
-
-
-
-\*\*Important:\*\* The frontend must save the access token securely and use it for authenticated requests.
+- `422 Unprocessable Entity`: Invalid input.
 
 
 
-\### 1.3 Get Current User
+**Important:** The frontend must save the access token securely and use it for authenticated requests.
 
 
 
-\*\*Endpoint:\*\* `GET /auth/me`  
+### 1.3 Get Current User
 
-\*\*Authentication:\*\* Required
+
+
+**Endpoint:** `GET /auth/me`  
+
+**Authentication:** Required
 
 
 
@@ -162,7 +162,7 @@ Header:
 
 ```http
 
-Authorization: Bearer YOUR\_ACCESS\_TOKEN
+Authorization: Bearer YOUR_ACCESS_TOKEN
 
 ```
 
@@ -176,13 +176,13 @@ Success Response:
 
 {
 
-&#x20; "id": 1,
+  "id": 1,
 
-&#x20; "first\_name": "Ali",
+  "first_name": "Ali",
 
-&#x20; "last\_name": "Ahmadi",
+  "last_name": "Ahmadi",
 
-&#x20; "email": "ali@example.com"
+  "email": "ali@example.com"
 
 }
 
@@ -190,21 +190,21 @@ Success Response:
 
 
 
-\---
+---
 
 
 
-\## 2. Ingredients
+## 2. Ingredients
 
 
 
-\### 2.1 Search Ingredients
+### 2.1 Search Ingredients
 
 
 
-\*\*Endpoint:\*\* `GET /ingredients/search`  
+**Endpoint:** `GET /ingredients/search`  
 
-\*\*Authentication:\*\* Not required
+**Authentication:** Not required
 
 
 
@@ -228,7 +228,7 @@ Example:
 
 ```http
 
-GET /ingredients/search?q=tomato\&limit=10
+GET /ingredients/search?q=tomato&limit=10
 
 ```
 
@@ -240,19 +240,19 @@ Success Response:
 
 ```json
 
-\[
 
-&#x20; {
 
-&#x20;   "id": 1,
+  {
 
-&#x20;   "name": "Tomato",
+    "id": 1,
 
-&#x20;   "category": "Vegetable",
+    "name": "Tomato",
 
-&#x20;   "default\_unit": "kg"
+    "category": "Vegetable",
 
-&#x20; }
+    "default_unit": "kg"
+
+  }
 
 ]
 
@@ -260,11 +260,11 @@ Success Response:
 
 
 
-\---
+---
 
 
 
-\## 3. Pantry
+## 3. Pantry
 
 
 
@@ -278,19 +278,19 @@ Required Header:
 
 ```http
 
-Authorization: Bearer YOUR\_ACCESS\_TOKEN
+Authorization: Bearer YOUR_ACCESS_TOKEN
 
 ```
 
 
 
-\### 3.1 Add Pantry Item
+### 3.1 Add Pantry Item
 
 
 
-\*\*Endpoint:\*\* `POST /pantry`  
+**Endpoint:** `POST /pantry`  
 
-\*\*Success Status:\*\* `201 Created`
+**Success Status:** `201 Created`
 
 
 
@@ -302,13 +302,13 @@ Request Body:
 
 {
 
-&#x20; "ingredient\_id": 1,
+  "ingredient_id": 1,
 
-&#x20; "quantity": 2,
+  "quantity": 2,
 
-&#x20; "unit": "kg",
+  "unit": "kg",
 
-&#x20; "expiry\_date": "2026-11-10"
+  "expiry_date": "2026-11-10"
 
 }
 
@@ -316,7 +316,7 @@ Request Body:
 
 
 
-`expiry\_date` can be `null`.
+`expiry_date` can be `null`.
 
 
 
@@ -328,29 +328,29 @@ Success Response:
 
 {
 
-&#x20; "id": 1,
+  "id": 1,
 
-&#x20; "ingredient\_id": 1,
+  "ingredient_id": 1,
 
-&#x20; "quantity": 2,
+  "quantity": 2,
 
-&#x20; "unit": "kg",
+  "unit": "kg",
 
-&#x20; "expiry\_date": "2026-11-10",
+  "expiry_date": "2026-11-10",
 
-&#x20; "created\_at": "2026-11-01T10:00:00",
+  "created_at": "2026-11-01T10:00:00",
 
-&#x20; "ingredient": {
+  "ingredient": {
 
-&#x20;   "id": 1,
+    "id": 1,
 
-&#x20;   "name": "Tomato",
+    "name": "Tomato",
 
-&#x20;   "category": "Vegetable",
+    "category": "Vegetable",
 
-&#x20;   "default\_unit": "kg"
+    "default_unit": "kg"
 
-&#x20; }
+  }
 
 }
 
@@ -360,21 +360,21 @@ Success Response:
 
 Possible Errors:
 
-\- `401 Unauthorized`: Missing or invalid token.
+- `401 Unauthorized`: Missing or invalid token.
 
-\- `404 Not Found`: Ingredient does not exist.
+- `404 Not Found`: Ingredient does not exist.
 
-\- `422 Unprocessable Entity`: Invalid input.
-
-
-
-\### 3.2 Get Pantry Items
+- `422 Unprocessable Entity`: Invalid input.
 
 
 
-\*\*Endpoint:\*\* `GET /pantry`  
+### 3.2 Get Pantry Items
 
-\*\*Authentication:\*\* Required
+
+
+**Endpoint:** `GET /pantry`  
+
+**Authentication:** Required
 
 
 
@@ -420,35 +420,35 @@ Success Response:
 
 ```json
 
-\[
 
-&#x20; {
 
-&#x20;   "id": 1,
+  {
 
-&#x20;   "ingredient\_id": 1,
+    "id": 1,
 
-&#x20;   "quantity": 2,
+    "ingredient_id": 1,
 
-&#x20;   "unit": "kg",
+    "quantity": 2,
 
-&#x20;   "expiry\_date": "2026-11-10",
+    "unit": "kg",
 
-&#x20;   "created\_at": "2026-11-01T10:00:00",
+    "expiry_date": "2026-11-10",
 
-&#x20;   "ingredient": {
+    "created_at": "2026-11-01T10:00:00",
 
-&#x20;     "id": 1,
+    "ingredient": {
 
-&#x20;     "name": "Tomato",
+      "id": 1,
 
-&#x20;     "category": "Vegetable",
+      "name": "Tomato",
 
-&#x20;     "default\_unit": "kg"
+      "category": "Vegetable",
 
-&#x20;   }
+      "default_unit": "kg"
 
-&#x20; }
+    }
+
+  }
 
 ]
 
@@ -460,13 +460,13 @@ Each user can only access their own pantry items.
 
 
 
-\### 3.3 Update Pantry Item
+### 3.3 Update Pantry Item
 
 
 
-\*\*Endpoint:\*\* `PATCH /pantry/{item\_id}`  
+**Endpoint:** `PATCH /pantry/{item_id}`  
 
-\*\*Authentication:\*\* Required
+**Authentication:** Required
 
 
 
@@ -478,7 +478,7 @@ Request Body (partial update):
 
 {
 
-&#x20; "quantity": 3
+  "quantity": 3
 
 }
 
@@ -488,11 +488,11 @@ Request Body (partial update):
 
 Other supported fields:
 
-\- `quantity`
+- `quantity`
 
-\- `unit`
+- `unit`
 
-\- `expiry\_date`
+- `expiry_date`
 
 
 
@@ -502,23 +502,23 @@ Success Response: Updated pantry item.
 
 Possible Errors:
 
-\- `401 Unauthorized`: Missing or invalid token.
+- `401 Unauthorized`: Missing or invalid token.
 
-\- `404 Not Found`: Item does not exist or does not belong to the current user.
+- `404 Not Found`: Item does not exist or does not belong to the current user.
 
-\- `422 Unprocessable Entity`: Invalid input.
-
-
-
-\### 3.4 Delete Pantry Item
+- `422 Unprocessable Entity`: Invalid input.
 
 
 
-\*\*Endpoint:\*\* `DELETE /pantry/{item\_id}`  
+### 3.4 Delete Pantry Item
 
-\*\*Authentication:\*\* Required  
 
-\*\*Success Status:\*\* `204 No Content`
+
+**Endpoint:** `DELETE /pantry/{item_id}`  
+
+**Authentication:** Required  
+
+**Success Status:** `204 No Content`
 
 
 
@@ -540,17 +540,17 @@ Success response has no body.
 
 Possible Errors:
 
-\- `401 Unauthorized`: Missing or invalid token.
+- `401 Unauthorized`: Missing or invalid token.
 
-\- `404 Not Found`: Item does not exist or does not belong to the current user.
-
-
-
-\---
+- `404 Not Found`: Item does not exist or does not belong to the current user.
 
 
 
-\## 4. Authentication Rules
+---
+
+
+
+## 4. Authentication Rules
 
 
 
@@ -560,7 +560,7 @@ For all protected endpoints, include:
 
 ```http
 
-Authorization: Bearer YOUR\_ACCESS\_TOKEN
+Authorization: Bearer YOUR_ACCESS_TOKEN
 
 ```
 
@@ -582,39 +582,39 @@ If the token is missing or invalid, the API returns `401 Unauthorized`.
 
 
 
-\---
+---
 
 
 
-\## 5. General API Rules
+## 5. General API Rules
 
 
 
-\- Request and response bodies use JSON.
+- Request and response bodies use JSON.
 
-\- Dates use `YYYY-MM-DD`.
+- Dates use `YYYY-MM-DD`.
 
-\- Date-time values use ISO 8601 format.
+- Date-time values use ISO 8601 format.
 
-\- Quantity must be greater than zero.
+- Quantity must be greater than zero.
 
-\- Email addresses must be valid.
+- Email addresses must be valid.
 
-\- Passwords must contain at least 8 characters.
+- Passwords must contain at least 8 characters.
 
-\- Registration requires matching `password` and `confirm\_password`.
+- Registration requires matching `password` and `confirm_password`.
 
-\- Pantry records are isolated by user.
+- Pantry records are isolated by user.
 
-\- Do not hardcode the production API URL in the Android application.
-
-
-
-\---
+- Do not hardcode the production API URL in the Android application.
 
 
 
-\## 6. Local Development
+---
+
+
+
+## 6. Local Development
 
 
 
@@ -642,19 +642,19 @@ http://127.0.0.1:8001/docs
 
 
 
-\*\*Android Emulator:\*\* Use `http://10.0.2.2:8001` instead of `127.0.0.1` when connecting to a backend running on the host computer.
+**Android Emulator:** Use `http://10.0.2.2:8001` instead of `127.0.0.1` when connecting to a backend running on the host computer.
 
 
 
-\*\*Physical Android Device:\*\* Use the computer's local network IP address, with the backend configured to accept network connections.
+**Physical Android Device:** Use the computer's local network IP address, with the backend configured to accept network connections.
 
 
 
-\---
+---
 
 
 
-\## 7. Future APIs
+## 7. Future APIs
 
 
 
@@ -662,17 +662,17 @@ The following features are not part of the current API contract yet:
 
 
 
-\- AI meal suggestions
+- AI meal suggestions
 
-\- Recipe management
+- Recipe management
 
-\- Nutrition analysis
+- Nutrition analysis
 
-\- Shopping lists
+- Shopping lists
 
-\- Expiration notifications
+- Expiration notifications
 
-\- OCR and image processing
+- OCR and image processing
 
 
 
