@@ -1,680 +1,296 @@
-﻿# Safreyar API Contract
+# Safreyar API Contract
 
-
-
-**Project:** Safreyar  
-
-**Backend:** FastAPI + PostgreSQL  
-
-**Frontend:** Kotlin  
-
-**API Base URL (Local):** `http://127.0.0.1:8001`
-
-
+**Backend:** FastAPI
+**Database:** PostgreSQL
+**API Base URL (Docker):** `http://localhost:8001`
+**Swagger Documentation:** `http://localhost:8001/docs`
 
 ---
-
-
 
 ## 1. Authentication
 
-
+All authentication endpoints use the `/auth` prefix.
 
 ### 1.1 Register
 
+**Endpoint:** `POST /auth/register`
 
-
-**Endpoint:** `POST /auth/register`  
-
-**Authentication:** Not required  
-
-**Success Status:** `201 Created`
-
-
-
-Request Body:
-
-
+**Request Body:**
 
 ```json
-
 {
-
-  "first_name": "Ali",
-
-  "last_name": "Ahmadi",
-
+  "name": "Ali Ahmadi",
   "email": "ali@example.com",
-
-  "password": "Password123",
-
-  "confirm_password": "Password123"
-
+  "password": "Password123"
 }
-
 ```
 
+**Validation:**
+- `name`: Required, 1–200 characters.
+- `email`: Required, valid email address.
+- `password`: Required, 8–72 characters.
+- Extra whitespace in the name is normalized.
+- Email is stored in lowercase.
+- `confirm_password` is not required by the backend.
 
-
-Success Response:
-
-
+**Success Response:** `201 Created`
 
 ```json
-
 {
-
   "id": 1,
-
-  "first_name": "Ali",
-
-  "last_name": "Ahmadi",
-
+  "name": "Ali Ahmadi",
   "email": "ali@example.com"
-
 }
-
 ```
 
-
-
-Possible Errors:
-
-- `409 Conflict`: Email already registered.
-
-- `422 Unprocessable Entity`: Invalid input.
-
-
+**Possible Errors:**
+- `409 Conflict`: Email is already registered.
+- `422 Unprocessable Entity`: Invalid request data.
 
 ### 1.2 Login
 
+**Endpoint:** `POST /auth/login`
 
-
-**Endpoint:** `POST /auth/login`  
-
-**Authentication:** Not required  
-
-**Success Status:** `200 OK`
-
-
-
-Request Body:
-
-
+**Request Body:**
 
 ```json
-
 {
-
   "email": "ali@example.com",
-
   "password": "Password123"
-
 }
-
 ```
 
-
-
-Success Response:
-
-
+**Success Response:** `200 OK`
 
 ```json
-
 {
-
   "access_token": "JWT_TOKEN",
-
   "token_type": "bearer"
-
 }
-
 ```
 
+The client must save the access token and send it in the Authorization header for protected endpoints.
 
+**Authorization Header:**
 
-Possible Errors:
+```http
+Authorization: Bearer JWT_TOKEN
+```
 
+**Possible Errors:**
 - `401 Unauthorized`: Incorrect email or password.
-
-- `422 Unprocessable Entity`: Invalid input.
-
-
-
-**Important:** The frontend must save the access token securely and use it for authenticated requests.
-
-
+- `422 Unprocessable Entity`: Invalid request data.
 
 ### 1.3 Get Current User
 
+**Endpoint:** `GET /auth/me`
 
+**Authentication:** Required.
 
-**Endpoint:** `GET /auth/me`  
-
-**Authentication:** Required
-
-
-
-Header:
-
-
-
-```http
-
-Authorization: Bearer YOUR_ACCESS_TOKEN
-
-```
-
-
-
-Success Response:
-
-
+**Success Response:** `200 OK`
 
 ```json
-
 {
-
   "id": 1,
-
-  "first_name": "Ali",
-
-  "last_name": "Ahmadi",
-
+  "name": "Ali Ahmadi",
   "email": "ali@example.com"
-
 }
-
 ```
 
-
-
 ---
-
-
 
 ## 2. Ingredients
 
-
-
 ### 2.1 Search Ingredients
 
+**Endpoint:** `GET /ingredients/search`
 
+**Authentication:** Not required.
 
-**Endpoint:** `GET /ingredients/search`  
+**Query Parameters:**
+- `q`: Search text.
+- `limit`: Maximum number of results. Default: 10, maximum: 50.
 
-**Authentication:** Not required
-
-
-
-Query Parameters:
-
-
-
-| Parameter | Required | Description |
-
-|---|---|---|
-
-| q | Yes | Ingredient name or search text |
-
-| limit | No | Maximum results (default: 10, max: 50) |
-
-
-
-Example:
-
-
+**Example:**
 
 ```http
-
-GET /ingredients/search?q=tomato&limit=10
-
+GET /ingredients/search?q=گوجه&limit=10
 ```
 
-
-
-Success Response:
-
-
+**Success Response:** `200 OK`
 
 ```json
-
-
-
+[
   {
-
     "id": 1,
-
-    "name": "Tomato",
-
-    "category": "Vegetable",
-
-    "default_unit": "kg"
-
+    "name": "گوجه فرنگی",
+    "category": "سبزیجات",
+    "default_unit": "عدد"
   }
-
 ]
-
 ```
 
-
+The database currently contains 105 seeded ingredients, primarily with Persian names. English searches such as `tomato` may return no results if no matching English name exists.
 
 ---
-
-
 
 ## 3. Pantry
 
-
-
 All pantry endpoints require JWT authentication.
-
-
-
-Required Header:
-
-
-
-```http
-
-Authorization: Bearer YOUR_ACCESS_TOKEN
-
-```
-
-
 
 ### 3.1 Add Pantry Item
 
+**Endpoint:** `POST /pantry`
 
-
-**Endpoint:** `POST /pantry`  
-
-**Success Status:** `201 Created`
-
-
-
-Request Body:
-
-
+**Request Body:**
 
 ```json
-
 {
-
-  "ingredient_id": 1,
-
+  "ingredient_id": 6,
   "quantity": 2,
-
-  "unit": "kg",
-
+  "unit": "عدد",
   "expiry_date": "2026-11-10"
-
 }
-
 ```
 
+`expiry_date` is optional and can be `null`.
 
-
-`expiry_date` can be `null`.
-
-
-
-Success Response:
-
-
+**Success Response:** `201 Created`
 
 ```json
-
 {
-
   "id": 1,
-
-  "ingredient_id": 1,
-
+  "ingredient_id": 6,
   "quantity": 2,
-
-  "unit": "kg",
-
+  "unit": "عدد",
   "expiry_date": "2026-11-10",
-
-  "created_at": "2026-11-01T10:00:00",
-
+  "created_at": "2026-11-04T10:00:00",
   "ingredient": {
-
-    "id": 1,
-
-    "name": "Tomato",
-
-    "category": "Vegetable",
-
-    "default_unit": "kg"
-
+    "id": 6,
+    "name": "گوجه فرنگی",
+    "category": "سبزیجات",
+    "default_unit": "عدد"
   }
-
 }
-
 ```
-
-
-
-Possible Errors:
-
-- `401 Unauthorized`: Missing or invalid token.
-
-- `404 Not Found`: Ingredient does not exist.
-
-- `422 Unprocessable Entity`: Invalid input.
-
-
 
 ### 3.2 Get Pantry Items
 
+**Endpoint:** `GET /pantry`
 
+**Query Parameters:**
+- `sort=id`: Sort by ID (default).
+- `sort=expiry`: Sort by nearest expiration date first.
 
-**Endpoint:** `GET /pantry`  
+Items without an expiration date appear last when using `sort=expiry`.
 
-**Authentication:** Required
-
-
-
-Optional Query Parameter:
-
-
-
-| Parameter | Values | Default |
-
-|---|---|---|
-
-| sort | `id`, `expiry` | `id` |
-
-
-
-Examples:
-
-
+**Example:**
 
 ```http
-
-GET /pantry
-
-```
-
-
-
-```http
-
 GET /pantry?sort=expiry
-
 ```
 
+**Success Response:** `200 OK`
 
-
-`sort=expiry` sorts items by nearest expiration date first. Items without an expiration date appear last.
-
-
-
-Success Response:
-
-
-
-```json
-
-
-
-  {
-
-    "id": 1,
-
-    "ingredient_id": 1,
-
-    "quantity": 2,
-
-    "unit": "kg",
-
-    "expiry_date": "2026-11-10",
-
-    "created_at": "2026-11-01T10:00:00",
-
-    "ingredient": {
-
-      "id": 1,
-
-      "name": "Tomato",
-
-      "category": "Vegetable",
-
-      "default_unit": "kg"
-
-    }
-
-  }
-
-]
-
-```
-
-
-
-Each user can only access their own pantry items.
-
-
+Returns a list of pantry items using the same response structure as Add Pantry Item.
 
 ### 3.3 Update Pantry Item
 
+**Endpoint:** `PATCH /pantry/{item_id}`
 
-
-**Endpoint:** `PATCH /pantry/{item_id}`  
-
-**Authentication:** Required
-
-
-
-Request Body (partial update):
-
-
+**Request Body:**
 
 ```json
-
 {
-
-  "quantity": 3
-
+  "quantity": 3,
+  "unit": "عدد",
+  "expiry_date": "2026-11-12"
 }
-
 ```
 
+Only the fields that need to be updated should be sent.
 
+**Success Response:** `200 OK`
 
-Other supported fields:
-
-- `quantity`
-
-- `unit`
-
-- `expiry_date`
-
-
-
-Success Response: Updated pantry item.
-
-
-
-Possible Errors:
-
-- `401 Unauthorized`: Missing or invalid token.
-
-- `404 Not Found`: Item does not exist or does not belong to the current user.
-
-- `422 Unprocessable Entity`: Invalid input.
-
-
+Returns the updated pantry item.
 
 ### 3.4 Delete Pantry Item
 
+**Endpoint:** `DELETE /pantry/{item_id}`
 
-
-**Endpoint:** `DELETE /pantry/{item_id}`  
-
-**Authentication:** Required  
-
-**Success Status:** `204 No Content`
-
-
-
-Example:
-
-
-
-```http
-
-DELETE /pantry/1
-
-```
-
-
-
-Success response has no body.
-
-
-
-Possible Errors:
-
-- `401 Unauthorized`: Missing or invalid token.
-
-- `404 Not Found`: Item does not exist or does not belong to the current user.
-
-
+**Success Response:** `204 No Content`
 
 ---
 
+## 4. Common API Rules
 
-
-## 4. Authentication Rules
-
-
-
-For all protected endpoints, include:
-
-
-
-```http
-
-Authorization: Bearer YOUR_ACCESS_TOKEN
-
-```
-
-
-
-The token is obtained from:
-
-
-
-```http
-
-POST /auth/login
-
-```
-
-
-
-If the token is missing or invalid, the API returns `401 Unauthorized`.
-
-
-
----
-
-
-
-## 5. General API Rules
-
-
-
-- Request and response bodies use JSON.
-
-- Dates use `YYYY-MM-DD`.
-
-- Date-time values use ISO 8601 format.
-
+- Content type for JSON requests: `application/json`.
+- Protected endpoints require a valid JWT access token.
+- Send the token using `Authorization: Bearer <token>`.
+- Dates use the ISO format: `YYYY-MM-DD`.
 - Quantity must be greater than zero.
-
-- Email addresses must be valid.
-
-- Passwords must contain at least 8 characters.
-
-- Registration requires matching `password` and `confirm_password`.
-
-- Pantry records are isolated by user.
-
-- Do not hardcode the production API URL in the Android application.
-
-
+- Invalid request data returns `422 Unprocessable Entity`.
+- Missing or invalid authentication returns `401 Unauthorized`.
 
 ---
 
+## 5. Development Environment
 
+### Local Backend
 
-## 6. Local Development
+Run the backend locally:
 
+```powershell
+python -m uvicorn app.main:app --reload --port 8001
+```
 
-
-Local backend URL:
-
-
+Base URL:
 
 ```text
-
 http://127.0.0.1:8001
-
 ```
 
+### Docker Backend
 
+Start the Docker services:
 
-Swagger documentation:
+```powershell
+docker compose --env-file .env.docker up -d --build
+```
 
-
+Base URL:
 
 ```text
-
-http://127.0.0.1:8001/docs
-
+http://localhost:8001
 ```
 
+### Android Emulator
 
+For Android Studio's standard emulator, use:
 
-**Android Emulator:** Use `http://10.0.2.2:8001` instead of `127.0.0.1` when connecting to a backend running on the host computer.
+```text
+http://10.0.2.2:8001/
+```
 
+For MEmu or another emulator, use the host computer's accessible LAN IPv4 address:
 
+```text
+http://HOST_LAN_IP:8001/
+```
 
-**Physical Android Device:** Use the computer's local network IP address, with the backend configured to accept network connections.
-
-
+The backend must be reachable from the emulator, and Android development builds using HTTP must allow cleartext traffic.
 
 ---
 
+## 6. Future Planned Features
 
+The following features are planned and are not part of the currently implemented API contract:
 
-## 7. Future APIs
-
-
-
-The following features are not part of the current API contract yet:
-
-
-
-- AI meal suggestions
-
-- Recipe management
-
-- Nutrition analysis
-
-- Shopping lists
-
-- Expiration notifications
-
-- OCR and image processing
-
-
-
-These endpoints will be documented when implemented.
-
+- AI-powered meal suggestions.
+- Recipe details and recipe management.
+- Nutrition analysis.
+- Daily and weekly meal planning.
+- Shopping list generation.
+- Expiration notifications.
+- Ingredient scanning and OCR.
+- AI-based ingredient substitutions.

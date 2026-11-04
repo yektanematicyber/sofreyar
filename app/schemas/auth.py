@@ -1,19 +1,20 @@
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from pydantic import model_validator
 
 class UserRegister(BaseModel):
-    first_name: str = Field(min_length=1, max_length=100)
-    last_name: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-    confirm_password: str = Field(min_length=8, max_length=72)
 
-    @model_validator(mode="after")
-    def check_passwords(self):
-        if self.password != self.confirm_password:
-            raise ValueError("Passwords do not match")
-        return self
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value):
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Name cannot be empty")
+        return value
 
 
 class UserLogin(BaseModel):
@@ -21,10 +22,11 @@ class UserLogin(BaseModel):
     password: str = Field(min_length=1, max_length=72)
 
 
+
+
 class UserResponse(BaseModel):
     id: int
-    first_name: str
-    last_name: str
+    name: str
     email: EmailStr
 
     model_config = {"from_attributes": True}

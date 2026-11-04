@@ -1,7 +1,9 @@
+
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 from app.dependencies import get_current_user
 from app.auth import (
     create_access_token,
@@ -29,8 +31,10 @@ def register_user(
     data: UserRegister,
     db: Session = Depends(get_db),
 ):
+    email = str(data.email).lower()
+
     existing_user = db.scalar(
-        select(User).where(User.email == str(data.email))
+        select(User).where(User.email == email)
     )
 
     if existing_user:
@@ -40,11 +44,11 @@ def register_user(
         )
 
     user = User(
-        first_name=data.first_name.strip(),
-        last_name=data.last_name.strip(),
-        email=str(data.email).lower(),
-        hashed_password=hash_password(data.password),
+    name=data.name,
+    email=email,
+    hashed_password=hash_password(data.password),
     )
+
     db.add(user)
 
     try:
@@ -66,6 +70,7 @@ def register_user(
         )
 
     return user
+
 
 @router.post("/login", response_model=TokenResponse)
 def login_user(
@@ -92,9 +97,9 @@ def login_user(
         "token_type": "bearer",
     }
 
+
 @router.get("/me", response_model=UserResponse)
 def read_current_user(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
-
