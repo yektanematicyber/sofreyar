@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -14,10 +15,10 @@ def search_ingredients(
     limit: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    return (
-        db.query(Ingredient)
-        .filter(Ingredient.name.ilike(f"%{q}%"))
+    stmt = (
+        select(Ingredient)
+        .where(Ingredient.name.ilike(f"%{q}%"))
         .order_by(Ingredient.name)
         .limit(limit)
-        .all()
     )
+    return list(db.scalars(stmt).all())

@@ -1,7 +1,5 @@
-
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from pydantic import model_validator
 
 class UserRegister(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -10,7 +8,7 @@ class UserRegister(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, value):
+    def validate_name(cls, value: str) -> str:
         value = " ".join(value.split())
         if not value:
             raise ValueError("Name cannot be empty")
@@ -20,8 +18,6 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=72)
-
-
 
 
 class UserResponse(BaseModel):

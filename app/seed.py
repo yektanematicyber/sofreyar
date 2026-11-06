@@ -1,3 +1,5 @@
+from sqlalchemy import func, select
+
 from app.database import SessionLocal
 from app.models import Ingredient
 
@@ -135,7 +137,7 @@ def seed():
     db = SessionLocal()
     try:
         # اسم موادی که از قبل در دیتابیس هستند
-        existing = {name for (name,) in db.query(Ingredient.name).all()}
+        existing = set(db.scalars(select(Ingredient.name)).all())
 
         new_items = []
         for category, items in SEED.items():
@@ -145,9 +147,10 @@ def seed():
                         Ingredient(name=name, category=category, default_unit=unit)
                     )
 
-        db.add_all(new_items)
-        db.commit()
-        total = db.query(Ingredient).count()
+        if new_items:
+            db.add_all(new_items)
+            db.commit()
+        total = db.scalar(select(func.count(Ingredient.id))) or 0
         print(f"added: {len(new_items)}, total in database: {total}")
     finally:
         db.close()

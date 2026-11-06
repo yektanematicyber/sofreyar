@@ -1,5 +1,5 @@
-﻿.venv
-venv
+.venv*
+venv*
 __pycache__
 *.py[cod]
 .git
@@ -9,6 +9,8 @@ __pycache__
 .mypy_cache
 .coverage
 htmlcov
+.kilo
+.agent
 .env
 .env.*
 !.env.example

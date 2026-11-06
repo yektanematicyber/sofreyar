@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -6,7 +7,7 @@ from app.database import Base
 class Ingredient(Base):
     __tablename__ = "ingredients"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, nullable=False, index=True)
-    category = Column(String(50), nullable=True)
-    default_unit = Column(String(20), nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    default_unit: Mapped[str | None] = mapped_column(String(20), nullable=True)

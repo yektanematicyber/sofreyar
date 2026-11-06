@@ -1,8 +1,8 @@
-
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -45,17 +45,21 @@ def list_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(PantryItem).filter(PantryItem.user_id == current_user.id)
+    stmt = (
+        select(PantryItem)
+        .options(joinedload(PantryItem.ingredient))
+        .where(PantryItem.user_id == current_user.id)
+    )
 
     if sort == "expiry":
-        query = query.order_by(
+        stmt = stmt.order_by(
             PantryItem.expiry_date.asc().nulls_last(),
             PantryItem.id,
         )
     else:
-        query = query.order_by(PantryItem.id)
+        stmt = stmt.order_by(PantryItem.id)
 
-    return query.all()
+    return list(db.scalars(stmt).all())
 
 
 def get_user_item(
@@ -63,14 +67,15 @@ def get_user_item(
     db: Session,
     user_id: int,
 ) -> PantryItem:
-    item = (
-        db.query(PantryItem)
-        .filter(
+    stmt = (
+        select(PantryItem)
+        .options(joinedload(PantryItem.ingredient))
+        .where(
             PantryItem.id == item_id,
             PantryItem.user_id == user_id,
         )
-        .first()
     )
+    item = db.scalar(stmt)
     if item is None:
         raise HTTPException(status_code=404, detail="Pantry item not found")
     return item
