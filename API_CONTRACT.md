@@ -97,6 +97,63 @@ Authorization: Bearer JWT_TOKEN
 }
 ```
 
+### 1.4 Forgot Password
+
+**Endpoint:** `POST /auth/forgot-password`
+
+**Authentication:** Not required.
+
+**Request Body:**
+
+```json
+{
+  "email": "ali@example.com"
+}
+```
+
+**Success Response:** `200 OK`
+
+```json
+{
+  "message": "If this email is registered, password reset instructions have been sent.",
+  "reset_token": "JWT_RESET_TOKEN"
+}
+```
+
+*Note:* `reset_token` is included for testing and development until email SMTP service is connected. If the email is not registered, `reset_token` is `null` (preventing user enumeration).
+
+### 1.5 Reset Password
+
+**Endpoint:** `POST /auth/reset-password`
+
+**Authentication:** Not required.
+
+**Request Body:**
+
+```json
+{
+  "token": "JWT_RESET_TOKEN",
+  "new_password": "NewSecretPassword123"
+}
+```
+
+**Validation:**
+- `token`: Required.
+- `new_password`: Required, 8–72 characters.
+
+**Success Response:** `200 OK`
+
+```json
+{
+  "message": "Password has been reset successfully. You can now log in."
+}
+```
+
+**Possible Errors:**
+- `400 Bad Request`: Invalid, expired, or already-used reset token.
+- `422 Unprocessable Entity`: Validation failure (e.g. password shorter than 8 characters).
+
+
 ---
 
 ## 2. Ingredients
@@ -231,6 +288,13 @@ Returns the updated pantry item.
 - Quantity must be greater than zero.
 - Invalid request data returns `422 Unprocessable Entity`.
 - Missing or invalid authentication returns `401 Unauthorized`.
+- **Rate Limiting:** Auth endpoints enforce sliding-window rate limits to prevent brute-force attacks:
+  - `POST /auth/login`: 5 requests per 60 seconds.
+  - `POST /auth/register`: 5 requests per 60 seconds.
+  - `POST /auth/forgot-password`: 3 requests per 10 minutes.
+  - `POST /auth/reset-password`: 5 requests per 5 minutes.
+  - When a rate limit is exceeded, the server returns `429 Too Many Requests` with a `Retry-After: <seconds>` header.
+
 
 ---
 

@@ -8,6 +8,11 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
+from app import rate_limiter
+
+# Disable rate limiting for unit tests to prevent test client throttling
+rate_limiter.RATE_LIMIT_ENABLED = False
+
 
 
 @pytest.fixture

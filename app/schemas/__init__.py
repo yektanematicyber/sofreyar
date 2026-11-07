@@ -1,4 +1,8 @@
 from app.schemas.auth import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    MessageResponse,
+    ResetPasswordRequest,
     TokenResponse,
     UserLogin,
     UserRegister,
@@ -16,6 +20,10 @@ from app.schemas.pantry_item import (
 )
 
 __all__ = [
+    "ForgotPasswordRequest",
+    "ForgotPasswordResponse",
+    "MessageResponse",
+    "ResetPasswordRequest",
     "TokenResponse",
     "UserLogin",
     "UserRegister",
