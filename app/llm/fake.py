@@ -1,3 +1,5 @@
+from typing import Any
+
 from app.llm.interface import (
     LLMService,
     MealType,
@@ -6,6 +8,7 @@ from app.llm.interface import (
     Recipe,
     RecipeIngredient,
 )
+from app.llm.telemetry import log_llm_telemetry
 
 
 class FakeLLMService(LLMService):
@@ -20,6 +23,9 @@ class FakeLLMService(LLMService):
         pantry_items: list[PantryItemInput],
         meal_type: MealType,
         servings: int,
+        user_id: int | None = None,
+        request_id: str | None = None,
+        **kwargs: Any,
     ) -> list[Recipe]:
         pantry_names = {item.name.strip().lower() for item in pantry_items}
         effective_servings = max(1, servings)
@@ -170,4 +176,17 @@ class FakeLLMService(LLMService):
             ),
         )
 
-        return [recipe1, recipe2, recipe3]
+        recipes = [recipe1, recipe2, recipe3]
+        log_llm_telemetry(
+            user_id=user_id,
+            request_id=request_id,
+            model_name="fake-llm",
+            input_tokens=100,
+            output_tokens=300,
+            latency_ms=10.0,
+            status="success",
+            retry_required=False,
+            from_cache=False,
+            is_fake=True,
+        )
+        return recipes
