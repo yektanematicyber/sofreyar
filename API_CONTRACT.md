@@ -279,7 +279,160 @@ Returns the updated pantry item.
 
 ---
 
-## 4. Common API Rules
+## 4. AI Meal Suggestions & Recipes
+
+This module provides AI-driven Persian recipe generation based on the authenticated user's pantry contents.
+
+### 4.1 Generate Meal Suggestions
+
+**Endpoint:** `POST /suggestions`  
+**Authentication:** Required (`Authorization: Bearer <token>`)
+
+**Request Body:**
+
+```json
+{
+  "meal_type": "lunch",
+  "servings": 2
+}
+```
+
+**Validation:**
+- `meal_type`: Required. Allowed values: `"breakfast"`, `"lunch"`, `"dinner"`, `"snack"`.
+- `servings`: Required integer, must be greater than zero (`> 0`). Default is `2`.
+- **Source of truth:** Pantry inventory is loaded directly from the database for the authenticated user. Client cannot manipulate available ingredients.
+- **Expiry prioritization:** Ingredients closest to expiration (lowest days left) are prioritized to minimize food waste.
+
+**Caching Behavior:**
+- A deterministic SHA-256 cache key is computed from: `user_id`, `meal_type`, `servings`, model version, and normalized/sorted pantry items (ingredient IDs, names, quantities, units, expiry dates).
+- If identical pantry state and parameters were processed within `RECIPE_CACHE_EXPIRE_HOURS` (default: 24h), cached recipes are returned instantly without calling the LLM.
+- Any change in pantry quantities, units, or expiry dates automatically generates a different hash, invalidating the previous cache.
+
+**Rate Limiting:**
+- Throttled per authenticated user (`SUGGESTIONS_RATE_LIMIT_TIMES` / `SUGGESTIONS_RATE_LIMIT_SECONDS`, default: 10 requests per 60 seconds).
+- Exceeding the quota returns `429 Too Many Requests` with a `Retry-After: <seconds>` header.
+
+**Success Response:** `200 OK`
+
+```json
+[
+  {
+    "id": 12,
+    "user_id": 1,
+    "title": "املت گوجه‌فرنگی قهوه‌خانه‌ای",
+    "summary": "یک املت اصیل و لذیذ ایرانی با گوجه‌فرنگی پخته و تخم‌مرغ تازه، مناسب برای صبحانه یا شام سریع.",
+    "emoji": "🍳",
+    "cooking_time": 15,
+    "time_minutes": 15,
+    "difficulty": "easy",
+    "servings": 2,
+    "ingredients": [
+      {
+        "name": "تخم‌مرغ",
+        "amount": 4.0,
+        "unit": "piece",
+        "in_pantry": true
+      },
+      {
+        "name": "گوجه‌فرنگی",
+        "amount": 4.0,
+        "unit": "piece",
+        "in_pantry": true
+      },
+      {
+        "name": "روغن مایع",
+        "amount": 20.0,
+        "unit": "ml",
+        "in_pantry": false
+      }
+    ],
+    "uses": ["تخم‌مرغ", "گوجه‌فرنگی"],
+    "missing": ["روغن مایع"],
+    "steps": [
+      "گوجه‌فرنگی‌ها را رنده یا نگینی خرد کرده و در تابه تفت دهید تا آب آن به آرامی تبخیر شود.",
+      "روغن مایع، نمک و فلفل را به گوجه‌ها اضافه کرده و کمی تفت دهید تا روغن خوش‌رنگ شود.",
+      "تخم‌مرغ‌ها را روی گوجه‌ها شکسته، به آرامی مخلوط کنید و بگذارید با حرارت ملایم ببندد."
+    ],
+    "nutrition": {
+      "calories": 210,
+      "protein_g": 13.0,
+      "fiber_g": 2.0,
+      "carbs_g": 6.0,
+      "fat_g": 15.0
+    },
+    "created_at": "2026-11-19T14:30:00"
+  }
+]
+```
+
+**Standardized Error Responses:**
+
+| HTTP Status | Error Code | Description | Example Detail |
+|---|---|---|---|
+| `400 Bad Request` | `EMPTY_PANTRY` | User pantry contains zero items | `انبار شما خالی است. لطفاً ابتدا موادی به انبار خود اضافه کنید.` |
+| `422 Unprocessable Entity` | `INVALID_REQUEST` | Unsupported meal type or non-positive servings | `داده‌های ورودی نامعتبر است.` |
+| `429 Too Many Requests` | `RATE_LIMIT_EXCEEDED` | User exceeded suggestions quota | `سقف مجاز درخواست‌های پیشنهاد غذا به پایان رسیده است.` |
+| `502 Bad Gateway` | `LLM_PROVIDER_ERROR` | Anthropic/Claude API unreachable | `خطا در برقراری ارتباط با ارائه‌دهنده هوش مصنوعی.` |
+| `502 Bad Gateway` | `INVALID_LLM_RESPONSE` | LLM response failed validation after retry | `پاسخ دریافتی از هوش مصنوعی ساختار معتبری نداشت.` |
+| `504 Gateway Timeout` | `LLM_TIMEOUT` | LLM call exceeded timeout threshold | `پاسخ سرویس هوش مصنوعی بیش از حد مجاز طول کشید.` |
+
+---
+
+### 4.2 Get Saved Recipe Details
+
+**Endpoint:** `GET /recipes/{id}`  
+**Authentication:** Required (`Authorization: Bearer <token>`)
+
+**Path Parameters:**
+- `id` (integer, required): Database primary key ID of the saved recipe.
+
+**Security & Data Isolation:**
+- Only the user who generated/saved the recipe can access it.
+- If the recipe does not exist or belongs to another user, the server returns `404 Not Found` with error code `RECIPE_NOT_FOUND`.
+- Does not invoke the LLM.
+
+**Success Response:** `200 OK`
+
+```json
+{
+  "id": 12,
+  "user_id": 1,
+  "title": "املت گوجه‌فرنگی قهوه‌خانه‌ای",
+  "summary": "یک املت اصیل و لذیذ ایرانی با گوجه‌فرنگی پخته و تخم‌مرغ تازه، مناسب برای صبحانه یا شام سریع.",
+  "emoji": "🍳",
+  "cooking_time": 15,
+  "time_minutes": 15,
+  "difficulty": "easy",
+  "servings": 2,
+  "ingredients": [
+    {
+      "name": "تخم‌مرغ",
+      "amount": 4.0,
+      "unit": "piece",
+      "in_pantry": true
+    }
+  ],
+  "uses": ["تخم‌مرغ"],
+  "missing": ["روغن"],
+  "steps": ["گوجه‌ها را تفت دهید..."],
+  "nutrition": {
+    "calories": 210,
+    "protein_g": 13.0,
+    "fiber_g": 2.0,
+    "carbs_g": 6.0,
+    "fat_g": 15.0
+  },
+  "created_at": "2026-11-19T14:30:00"
+}
+```
+
+**Possible Errors:**
+- `401 Unauthorized`: Missing or invalid Bearer token.
+- `404 Not Found`: Recipe with given ID does not exist or belongs to another user (`RECIPE_NOT_FOUND`).
+
+---
+
+## 5. Common API Rules
 
 - Content type for JSON requests: `application/json`.
 - Protected endpoints require a valid JWT access token.
@@ -298,7 +451,7 @@ Returns the updated pantry item.
 
 ---
 
-## 5. Development Environment
+## 6. Development Environment
 
 ### Local Backend
 
@@ -346,15 +499,13 @@ The backend must be reachable from the emulator, and Android development builds 
 
 ---
 
-## 6. Future Planned Features
+## 7. Future Planned Features
 
-The following features are planned and are not part of the currently implemented API contract:
+The following features are planned for future sprints:
 
-- AI-powered meal suggestions.
-- Recipe details and recipe management.
-- Nutrition analysis.
-- Daily and weekly meal planning.
-- Shopping list generation.
-- Expiration notifications.
-- Ingredient scanning and OCR.
-- AI-based ingredient substitutions.
+- Nutrition goal tracking & historical analytics.
+- Daily and weekly meal schedule planning.
+- Automated grocery shopping list generation.
+- Daily push notifications for items nearing expiration ($\le 3$ days).
+- Receipt & ingredient packaging barcode/OCR scanner.
+- Semantic ingredient substitution engine (e.g. Greek yogurt for sour cream).

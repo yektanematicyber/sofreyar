@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.database import Base, engine
 from app import models
-from app.routers import auth, ingredients, pantry
+from app.exceptions import AppException
+from app.routers import auth, ingredients, pantry, recipes, suggestions
 
 
 @asynccontextmanager
@@ -18,7 +21,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Safreyar API",
     description="Backend API for the Safreyar application",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -30,9 +33,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    """Custom exception handler ensuring standard machine-readable error codes."""
+    content = {
+        "detail": exc.detail,
+        "error_code": exc.error_code,
+    }
+    if exc.extra:
+        content["extra"] = exc.extra
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=content,
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Formats Pydantic validation errors with consistent INVALID_REQUEST error code."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "داده‌های ورودی نامعتبر است.",
+            "error_code": "INVALID_REQUEST",
+            "errors": exc.errors(),
+        },
+    )
+
+
 app.include_router(auth.router)
 app.include_router(ingredients.router)
 app.include_router(pantry.router)
+app.include_router(suggestions.router)
+app.include_router(recipes.router)
 
 
 @app.get("/")
