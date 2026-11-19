@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Diagnostic script for manual prompt review against the real Anthropic Claude API.
 
-Runs 12 diverse sample pantries (sparse, large, near-expiry, vegetarian, breakfast, etc.)
+Runs 16 diverse, representative sample pantries (sparse, large, near-expiry, vegetarian,
+English aliases, single large quantities, breakfast/lunch/dinner/snack, single/multi servings)
 and prints formatted outputs with latency and token telemetry for manual quality evaluation.
 
 Usage:
@@ -125,7 +126,7 @@ SAMPLE_SCENARIOS: list[dict] = [
     },
     {
         "id": 9,
-        "name": "ورزشی و پرپروتئین",
+        "name": "ورزشی و پرپروتئین (تک‌نفره)",
         "meal_type": "dinner",
         "servings": 1,
         "items": [
@@ -161,16 +162,66 @@ SAMPLE_SCENARIOS: list[dict] = [
     },
     {
         "id": 12,
-        "name": "انبار متنوع و مفصل خانوادگی",
+        "name": "انبار متنوع و مفصل خانوادگی (۶ نفره)",
         "meal_type": "dinner",
-        "servings": 4,
+        "servings": 6,
         "items": [
-            PantryItemInput(name="گوشت چرخ‌کرده", quantity=400.0, unit="g", expiry_date=TODAY + timedelta(days=2)),
-            PantryItemInput(name="بادمجان", quantity=4.0, unit="piece", expiry_date=TODAY + timedelta(days=3)),
-            PantryItemInput(name="گوجه‌فرنگی", quantity=5.0, unit="piece", expiry_date=TODAY + timedelta(days=4)),
-            PantryItemInput(name="سیب‌زمینی", quantity=4.0, unit="piece"),
-            PantryItemInput(name="پیاز", quantity=3.0, unit="piece"),
-            PantryItemInput(name="ماکارونی", quantity=500.0, unit="g"),
+            PantryItemInput(name="گوشت چرخ‌کرده", quantity=600.0, unit="g", expiry_date=TODAY + timedelta(days=2)),
+            PantryItemInput(name="بادمجان", quantity=5.0, unit="piece", expiry_date=TODAY + timedelta(days=3)),
+            PantryItemInput(name="گوجه‌فرنگی", quantity=6.0, unit="piece", expiry_date=TODAY + timedelta(days=4)),
+            PantryItemInput(name="سیب‌زمینی", quantity=5.0, unit="piece"),
+            PantryItemInput(name="پیاز", quantity=4.0, unit="piece"),
+            PantryItemInput(name="ماکارونی", quantity=700.0, unit="g"),
+        ],
+    },
+    {
+        "id": 13,
+        "name": "حجم زیاد از یک ماده غذایی (انبوه بادمجان)",
+        "meal_type": "dinner",
+        "servings": 3,
+        "items": [
+            PantryItemInput(name="بادمجان قلمی", quantity=4.0, unit="kg", expiry_date=TODAY + timedelta(days=3)),
+            PantryItemInput(name="سیر", quantity=1.0, unit="piece"),
+            PantryItemInput(name="گوجه‌فرنگی", quantity=3.0, unit="piece"),
+            PantryItemInput(name="تخم‌مرغ", quantity=2.0, unit="piece"),
+        ],
+    },
+    {
+        "id": 14,
+        "name": "نام‌های انگلیسی / فینگیلیش و بدون تاریخ انقضا",
+        "meal_type": "lunch",
+        "servings": 2,
+        "items": [
+            PantryItemInput(name="Chicken Breast", quantity=400.0, unit="g"),
+            PantryItemInput(name="Olive Oil", quantity=100.0, unit="ml"),
+            PantryItemInput(name="Garlic", quantity=2.0, unit="piece"),
+            PantryItemInput(name="Rice", quantity=500.0, unit="g"),
+        ],
+    },
+    {
+        "id": 15,
+        "name": "چندین قلم اضطراری همزمان در آستانه انقضا (امروز و فردا)",
+        "meal_type": "dinner",
+        "servings": 2,
+        "items": [
+            PantryItemInput(name="گوشت چرخ‌کرده", quantity=250.0, unit="g", expiry_date=TODAY),
+            PantryItemInput(name="قارچ تازه", quantity=200.0, unit="g", expiry_date=TODAY),
+            PantryItemInput(name="خامه صبحانه", quantity=150.0, unit="g", expiry_date=TODAY + timedelta(days=1)),
+            PantryItemInput(name="فلفل دلمه‌ای", quantity=1.0, unit="piece", expiry_date=TODAY + timedelta(days=1)),
+            PantryItemInput(name="پاستا پنه", quantity=300.0, unit="g"),
+        ],
+    },
+    {
+        "id": 16,
+        "name": "واحدهای متنوع (لیتر، کیلوگرم، قاشق، عدد)",
+        "meal_type": "breakfast",
+        "servings": 2,
+        "items": [
+            PantryItemInput(name="آرد گندم", quantity=0.5, unit="kg"),
+            PantryItemInput(name="شیر پاستوریزه", quantity=0.25, unit="l"),
+            PantryItemInput(name="تخم‌مرغ", quantity=2.0, unit="piece"),
+            PantryItemInput(name="شکر", quantity=40.0, unit="g"),
+            PantryItemInput(name="روغن", quantity=30.0, unit="ml"),
         ],
     },
 ]
