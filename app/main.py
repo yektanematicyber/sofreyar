@@ -1,14 +1,18 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import Base, engine
 from app import models
 from app.exceptions import AppException
 from app.routers import auth, ingredients, pantry, recipes, suggestions
+
+logger = logging.getLogger("safreyar.api")
 
 
 @asynccontextmanager
@@ -59,6 +63,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "detail": "داده‌های ورودی نامعتبر است.",
             "error_code": "INVALID_REQUEST",
             "errors": exc.errors(),
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    """Maps unhandled database errors to standard DATABASE_ERROR 500 response."""
+    logger.exception("Database error occurred: %s", exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "خطای داخلی در پایگاه داده رخ داده است.",
+            "error_code": "DATABASE_ERROR",
         },
     )
 

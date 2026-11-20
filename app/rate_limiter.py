@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 from threading import Lock
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import HTTPException, Request, status
 
@@ -16,6 +17,51 @@ RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() in (
     "1",
     "yes",
 )
+
+LUA_SLIDING_WINDOW_SCRIPT = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local member = ARGV[4]
+
+local cutoff = now - window
+redis.call('ZREMRANGEBYSCORE', key, '-inf', cutoff)
+local current_count = redis.call('ZCARD', key)
+
+if current_count >= limit then
+    local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+    local oldest_ts = now
+    if oldest and #oldest >= 2 then
+        oldest_ts = tonumber(oldest[2])
+    end
+    local retry_after = math.max(1, math.ceil(window - (now - oldest_ts)))
+    return {0, retry_after}
+else
+    redis.call('ZADD', key, now, member)
+    redis.call('EXPIRE', key, math.ceil(window + 5))
+    return {1, 0}
+end
+"""
+
+
+def sanitize_redis_url(url: str) -> str:
+    """Masks password and credentials in Redis URL for safe logging."""
+    if not url:
+        return ""
+    try:
+        parts = urlsplit(url)
+        if parts.password:
+            user = parts.username or ""
+            port = f":{parts.port}" if parts.port else ""
+            if user:
+                netloc = f"{user}:***@{parts.hostname}{port}"
+            else:
+                netloc = f":***@{parts.hostname}{port}"
+            return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+        return url
+    except Exception:
+        return "redis://***"
 
 
 class RateLimiter:
@@ -85,17 +131,21 @@ class UserRateLimiter:
         self.requests: dict[str, list[float]] = defaultdict(list)
         self.lock = Lock()
         self.redis_client = None
+        self.lua_script = None
 
         redis_url = os.getenv("REDIS_URL")
         if redis_url:
+            sanitized_url = sanitize_redis_url(redis_url)
             try:
                 import redis
+
                 self.redis_client = redis.from_url(redis_url)
-                logger.info("UserRateLimiter connected to Redis: %s", redis_url)
+                self.lua_script = self.redis_client.register_script(LUA_SLIDING_WINDOW_SCRIPT)
+                logger.info("UserRateLimiter connected to Redis: %s", sanitized_url)
             except Exception as err:
                 logger.warning(
                     "UserRateLimiter failed to connect to Redis (%s), falling back to in-memory: %s",
-                    redis_url,
+                    sanitized_url,
                     err,
                 )
 
@@ -110,24 +160,18 @@ class UserRateLimiter:
         key = f"rate_limit:user:{user_id}:suggestions"
         now = time.time()
 
-        if self.redis_client:
+        if self.redis_client and self.lua_script:
             try:
-                pipe = self.redis_client.pipeline()
-                cutoff = now - self.seconds
-                pipe.zremrangebyscore(key, 0, cutoff)
-                pipe.zcard(key)
-                pipe.zrange(key, 0, 0, withscores=True)
-                _, current_count, oldest_entry = pipe.execute()
+                unique_member = f"{now}_{time.perf_counter()}"
+                res = self.lua_script(
+                    keys=[key],
+                    args=[now, self.seconds, self.times, unique_member],
+                )
+                allowed = int(res[0])
+                retry_after = int(res[1])
 
-                if current_count >= self.times:
-                    oldest_ts = oldest_entry[0][1] if oldest_entry else now
-                    retry_after = max(1, int(self.seconds - (now - oldest_ts)))
+                if not allowed:
                     raise RateLimitExceededException(retry_after=retry_after)
-
-                pipe = self.redis_client.pipeline()
-                pipe.zadd(key, {str(now): now})
-                pipe.expire(key, self.seconds + 5)
-                pipe.execute()
                 return
             except RateLimitExceededException:
                 raise

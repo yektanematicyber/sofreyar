@@ -7,7 +7,9 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.llm.config import get_llm_config
 from app.llm.interface import Recipe as LLMRecipe
+from app.llm.prompts import PROMPT_VERSION
 from app.models.pantry_item import PantryItem, utc_now_naive
 from app.models.recipe import Recipe
 
@@ -27,14 +29,20 @@ def compute_recipe_cache_hash(
     meal_type: str,
     servings: int,
     pantry_items: Sequence[PantryItem],
-    model_version: str = "claude-3-5-sonnet:v1",
+    model_name: str | None = None,
+    prompt_version: str | None = None,
 ) -> str:
     """Computes a deterministic, collision-resistant SHA-256 cache key.
 
-    Incorporates user_id, meal_type, servings, model version, and normalized/sorted
-    pantry inventory (including IDs, quantities, units, and expiry dates).
-    Any modification in quantity, unit, or expiration produces a distinct hash.
+    Incorporates user_id, meal_type, servings, configured LLM model, prompt version,
+    and normalized/sorted pantry inventory (including IDs, quantities, units, and expiry dates).
+    Any modification in model, prompt version, quantity, unit, or expiration produces a distinct hash.
     """
+    if model_name is None:
+        model_name = get_llm_config().llm_model
+    if prompt_version is None:
+        prompt_version = PROMPT_VERSION
+
     normalized_items = []
     for item in pantry_items:
         ing_id = item.ingredient_id
@@ -51,7 +59,8 @@ def compute_recipe_cache_hash(
         "user_id": user_id,
         "meal_type": meal_type.strip().lower(),
         "servings": int(servings),
-        "model_version": model_version.strip(),
+        "model_name": model_name.strip(),
+        "prompt_version": prompt_version.strip(),
         "pantry": [
             {
                 "id": ing_id,

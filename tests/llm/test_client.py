@@ -171,6 +171,31 @@ def test_build_user_prompt_prioritizes_expiry():
     assert pos_panir < pos_mast < pos_shir < pos_berenj
 
 
+def test_build_user_prompt_flags_expired_items_as_unsafe():
+    today = date.today()
+    items = [
+        PantryItemInput(
+            name="شیر فاسد",
+            quantity=1.0,
+            unit="l",
+            expiry_date=today - timedelta(days=2),
+        ),
+        PantryItemInput(
+            name="ماست تازه",
+            quantity=500.0,
+            unit="g",
+            expiry_date=today + timedelta(days=2),
+        ),
+    ]
+
+    prompt = build_user_prompt(items, meal_type="breakfast", servings=2)
+
+    assert "منقضی شده و غیرقابل مصرف" in prompt
+    assert "خطر سلامتی" in prompt
+    assert "سالم، اولویت بالا" in prompt
+    assert "هرگز از اقلام منقضی‌شده و فاسد استفاده نکنید" in prompt
+
+
 def test_client_valid_json_success():
     mock_anthropic = MagicMock()
     mock_messages = AsyncMock()

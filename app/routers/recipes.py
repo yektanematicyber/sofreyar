@@ -1,11 +1,16 @@
+import logging
+
 from fastapi import APIRouter, Depends, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.exceptions import RecipeNotFoundException
+from app.exceptions import DatabaseException, RecipeNotFoundException
 from app.models import Recipe, User
 from app.schemas.recipe import RecipeOut
+
+logger = logging.getLogger("safreyar.recipes")
 
 router = APIRouter(prefix="/recipes", tags=["Recipes"])
 
@@ -29,7 +34,11 @@ def get_recipe_by_id(
         does not exist or belongs to another user.
       - Zero LLM calls on retrieval.
     """
-    recipe = db.get(Recipe, recipe_id)
+    try:
+        recipe = db.get(Recipe, recipe_id)
+    except SQLAlchemyError as err:
+        logger.exception("Database error while fetching recipe_id=%d: %s", recipe_id, err)
+        raise DatabaseException() from err
 
     if recipe is None or recipe.user_id != current_user.id:
         raise RecipeNotFoundException()

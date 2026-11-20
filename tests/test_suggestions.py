@@ -1,6 +1,6 @@
 import os
 from datetime import date, timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app import rate_limiter
@@ -401,3 +401,154 @@ def test_suggestions_llm_provider_error_mapped_to_502(client, db_session, monkey
     data = res.json()
     assert data["error_code"] == "LLM_PROVIDER_ERROR"
     assert "خطا در برقراری ارتباط" in data["detail"]
+
+
+# ==============================================================================
+# 6. Sprint 2 Review Regression Tests (Cache, Redis Lua, DB Errors, Sanitization)
+# ==============================================================================
+
+def test_recipe_cache_model_change_invalidates_cache(db_session):
+    from app.services.recipe_cache import compute_recipe_cache_hash
+
+    ing = seed_ingredient(db_session, name="نان سنگک")
+    today = date.today()
+    item = PantryItem(id=1, user_id=1, ingredient_id=ing.id, quantity=1.0, unit="piece", expiry_date=today)
+    item.ingredient = ing
+
+    hash_sonnet = compute_recipe_cache_hash(
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-sonnet-20241022", prompt_version="v1"
+    )
+    hash_haiku = compute_recipe_cache_hash(
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-haiku-20241022", prompt_version="v1"
+    )
+
+    assert hash_sonnet != hash_haiku
+
+
+def test_recipe_cache_prompt_version_change_invalidates_cache(db_session):
+    from app.services.recipe_cache import compute_recipe_cache_hash
+
+    ing = seed_ingredient(db_session, name="گردو")
+    item = PantryItem(id=1, user_id=1, ingredient_id=ing.id, quantity=100.0, unit="g")
+    item.ingredient = ing
+
+    hash_v1 = compute_recipe_cache_hash(
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-sonnet", prompt_version="v1"
+    )
+    hash_v2 = compute_recipe_cache_hash(
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-sonnet", prompt_version="v2"
+    )
+
+    assert hash_v1 != hash_v2
+
+
+def test_redis_url_sanitization():
+    from app.rate_limiter import sanitize_redis_url
+
+    masked1 = sanitize_redis_url("redis://:mysecretpass@localhost:6379/0")
+    assert masked1 == "redis://:***@localhost:6379/0"
+    assert "mysecretpass" not in masked1
+
+    masked2 = sanitize_redis_url("redis://admin:super_secret@redis.internal:6380/2")
+    assert masked2 == "redis://admin:***@redis.internal:6380/2"
+    assert "super_secret" not in masked2
+
+    unmasked = sanitize_redis_url("redis://localhost:6379/0")
+    assert unmasked == "redis://localhost:6379/0"
+
+
+def test_redis_atomic_rate_limiter_lua_execution():
+    from app.exceptions import RateLimitExceededException
+    from app.rate_limiter import UserRateLimiter, RATE_LIMIT_ENABLED
+    import app.rate_limiter as rate_limiter_mod
+
+    rate_limiter_mod.RATE_LIMIT_ENABLED = True
+    try:
+        limiter = UserRateLimiter(times=2, seconds=60)
+        mock_redis = MagicMock()
+        mock_lua = MagicMock()
+        mock_lua.side_effect = [
+            [1, 0],   # Request 1: allowed
+            [1, 0],   # Request 2: allowed
+            [0, 45],  # Request 3: blocked with 45s retry
+        ]
+        limiter.redis_client = mock_redis
+        limiter.lua_script = mock_lua
+
+        limiter.check(user_id=999)
+        limiter.check(user_id=999)
+
+        with pytest.raises(RateLimitExceededException) as exc_info:
+            limiter.check(user_id=999)
+
+        assert exc_info.value.status_code == 429
+        assert exc_info.value.headers["Retry-After"] == "45"
+        assert mock_lua.call_count == 3
+    finally:
+        rate_limiter_mod.RATE_LIMIT_ENABLED = False
+
+
+def test_redis_rate_limiter_fallback_on_error():
+    from app.rate_limiter import UserRateLimiter
+    import app.rate_limiter as rate_limiter_mod
+
+    rate_limiter_mod.RATE_LIMIT_ENABLED = True
+    try:
+        limiter = UserRateLimiter(times=1, seconds=60)
+        mock_redis = MagicMock()
+        mock_lua = MagicMock()
+        mock_lua.side_effect = ConnectionError("Redis is unreachable")
+        limiter.redis_client = mock_redis
+        limiter.lua_script = mock_lua
+
+        # First request: Redis fails, falls back to in-memory, succeeds
+        limiter.check(user_id=888)
+
+        # Second request: Redis fails, falls back to in-memory, blocked!
+        from app.exceptions import RateLimitExceededException
+        with pytest.raises(RateLimitExceededException):
+            limiter.check(user_id=888)
+    finally:
+        rate_limiter_mod.RATE_LIMIT_ENABLED = False
+
+
+def test_database_error_mapped_to_500_database_error(client, db_session):
+    headers, user_id = create_user_and_token(client, email="db_err_user@example.com")
+    from app.database import get_db
+    from sqlalchemy.exc import OperationalError
+
+    def mock_db_with_error():
+        mock_session = MagicMock()
+        mock_session.scalars.side_effect = OperationalError("connection lost", {}, Exception())
+        yield mock_session
+
+    client.app.dependency_overrides[get_db] = mock_db_with_error
+    try:
+        res = client.post("/suggestions", headers=headers, json={"meal_type": "lunch", "servings": 2})
+        assert res.status_code == 500
+        data = res.json()
+        assert data["error_code"] == "DATABASE_ERROR"
+        assert "پایگاه داده" in data["detail"]
+    finally:
+        client.app.dependency_overrides.pop(get_db, None)
+
+
+def test_recipe_get_database_error_mapped_to_500(client, db_session):
+    headers, user_id = create_user_and_token(client, email="db_recipe_err@example.com")
+    from app.database import get_db
+    from sqlalchemy.exc import OperationalError
+
+    def mock_db_with_error():
+        mock_session = MagicMock()
+        mock_session.get.side_effect = OperationalError("disk error", {}, Exception())
+        yield mock_session
+
+    client.app.dependency_overrides[get_db] = mock_db_with_error
+    try:
+        res = client.get("/recipes/123", headers=headers)
+        assert res.status_code == 500
+        data = res.json()
+        assert data["error_code"] == "DATABASE_ERROR"
+        assert "پایگاه داده" in data["detail"]
+    finally:
+        client.app.dependency_overrides.pop(get_db, None)

@@ -3,11 +3,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.exceptions import (
+    DatabaseException,
     EmptyPantryException,
     InvalidLLMResponseException,
     LLMProviderException,
@@ -55,12 +57,16 @@ async def generate_suggestions(
     suggestions_rate_limiter.check(current_user.id)
 
     # 2. Retrieve pantry items belonging strictly to the authenticated user
-    stmt = (
-        select(PantryItem)
-        .options(joinedload(PantryItem.ingredient))
-        .where(PantryItem.user_id == current_user.id)
-    )
-    pantry_records = list(db.scalars(stmt).all())
+    try:
+        stmt = (
+            select(PantryItem)
+            .options(joinedload(PantryItem.ingredient))
+            .where(PantryItem.user_id == current_user.id)
+        )
+        pantry_records = list(db.scalars(stmt).all())
+    except SQLAlchemyError as err:
+        logger.exception("Database error while fetching pantry items for user_id=%d: %s", current_user.id, err)
+        raise DatabaseException() from err
 
     # 3. Handle empty pantry
     if not pantry_records:
@@ -75,11 +81,16 @@ async def generate_suggestions(
     )
 
     # 5. Check cache in database
-    cached_recipes = get_cached_recipes(
-        db=db,
-        user_id=current_user.id,
-        cache_hash=cache_hash,
-    )
+    try:
+        cached_recipes = get_cached_recipes(
+            db=db,
+            user_id=current_user.id,
+            cache_hash=cache_hash,
+        )
+    except SQLAlchemyError as err:
+        logger.exception("Database error while checking recipe cache for user_id=%d: %s", current_user.id, err)
+        raise DatabaseException() from err
+
     if cached_recipes:
         logger.info(
             "Recipe cache hit | user_id=%d cache_hash=%s",
@@ -113,6 +124,7 @@ async def generate_suggestions(
     # 7. Call LLM service
     request_id = str(uuid.uuid4())
     llm_service = get_llm_service()
+    model_name = getattr(getattr(llm_service, "config", None), "llm_model", "fake-persian-model")
 
     try:
         generated_recipes = await llm_service.generate_recipes(
@@ -124,20 +136,52 @@ async def generate_suggestions(
         )
     except LLMTimeout as err:
         logger.warning("LLM call timed out for user_id=%d: %s", current_user.id, err)
+        log_llm_telemetry(
+            user_id=current_user.id,
+            request_id=request_id,
+            model_name=model_name,
+            input_tokens=0,
+            output_tokens=0,
+            latency_ms=0.0,
+            status="timeout",
+        )
         raise LLMTimeoutException() from err
     except LLMInvalidResponse as err:
         logger.error("LLM generated invalid response for user_id=%d: %s", current_user.id, err)
+        log_llm_telemetry(
+            user_id=current_user.id,
+            request_id=request_id,
+            model_name=model_name,
+            input_tokens=0,
+            output_tokens=0,
+            latency_ms=0.0,
+            status="failed",
+            retry_required=True,
+        )
         raise InvalidLLMResponseException() from err
     except Exception as err:
         logger.exception("Unexpected LLM provider error for user_id=%d: %s", current_user.id, err)
+        log_llm_telemetry(
+            user_id=current_user.id,
+            request_id=request_id,
+            model_name=model_name,
+            input_tokens=0,
+            output_tokens=0,
+            latency_ms=0.0,
+            status="provider_error",
+        )
         raise LLMProviderException() from err
 
     # 8. Persist validated recipes in PostgreSQL with cache hash
-    saved_recipes = save_recipes_to_db(
-        db=db,
-        user_id=current_user.id,
-        recipes=generated_recipes,
-        cache_hash=cache_hash,
-    )
+    try:
+        saved_recipes = save_recipes_to_db(
+            db=db,
+            user_id=current_user.id,
+            recipes=generated_recipes,
+            cache_hash=cache_hash,
+        )
+    except SQLAlchemyError as err:
+        logger.exception("Database error while saving recipes for user_id=%d: %s", current_user.id, err)
+        raise DatabaseException() from err
 
     return saved_recipes
