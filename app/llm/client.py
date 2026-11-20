@@ -16,6 +16,7 @@ from app.llm.interface import (
     Recipe,
 )
 from app.llm.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
+from app.llm.telemetry import log_llm_telemetry
 
 logger = logging.getLogger("safreyar.llm")
 
@@ -149,15 +150,31 @@ class AnthropicLLMService(LLMService):
         pantry_items: list[PantryItemInput],
         meal_type: MealType,
         servings: int,
+        user_id: int | None = None,
+        request_id: str | None = None,
+        **kwargs: Any,
     ) -> list[Recipe]:
         """Generates exactly 3 recipes from pantry items with one-shot retry validation."""
         initial_prompt = build_user_prompt(pantry_items, meal_type, servings)
 
         # Attempt 1
-        raw_text, _, _, _ = await self._call_model(initial_prompt, attempt=1)
+        raw_text, in_tok1, out_tok1, lat1 = await self._call_model(initial_prompt, attempt=1)
         first_error_msg = ""
         try:
-            return _parse_and_validate_recipes(raw_text)
+            recipes = _parse_and_validate_recipes(raw_text)
+            log_llm_telemetry(
+                user_id=user_id,
+                request_id=request_id,
+                model_name=self.config.llm_model,
+                input_tokens=in_tok1,
+                output_tokens=out_tok1,
+                latency_ms=lat1,
+                status="success",
+                retry_required=False,
+                from_cache=False,
+                is_fake=False,
+            )
+            return recipes
         except ValueError as first_err:
             first_error_msg = str(first_err)
             logger.warning(
@@ -167,10 +184,38 @@ class AnthropicLLMService(LLMService):
 
         # Attempt 2 (One-shot retry with error in prompt)
         retry_prompt = build_retry_prompt(initial_prompt, raw_text, first_error_msg)
-        raw_retry_text, _, _, _ = await self._call_model(retry_prompt, attempt=2)
+        raw_retry_text, in_tok2, out_tok2, lat2 = await self._call_model(retry_prompt, attempt=2)
+        total_in = in_tok1 + in_tok2
+        total_out = out_tok1 + out_tok2
+        total_lat = lat1 + lat2
         try:
-            return _parse_and_validate_recipes(raw_retry_text)
+            recipes = _parse_and_validate_recipes(raw_retry_text)
+            log_llm_telemetry(
+                user_id=user_id,
+                request_id=request_id,
+                model_name=self.config.llm_model,
+                input_tokens=total_in,
+                output_tokens=total_out,
+                latency_ms=total_lat,
+                status="success",
+                retry_required=True,
+                from_cache=False,
+                is_fake=False,
+            )
+            return recipes
         except ValueError as second_err:
+            log_llm_telemetry(
+                user_id=user_id,
+                request_id=request_id,
+                model_name=self.config.llm_model,
+                input_tokens=total_in,
+                output_tokens=total_out,
+                latency_ms=total_lat,
+                status="failed",
+                retry_required=True,
+                from_cache=False,
+                is_fake=False,
+            )
             logger.error(
                 "Second LLM response validation failed after retry. Reason: %s",
                 second_err,

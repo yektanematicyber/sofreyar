@@ -63,6 +63,15 @@ def test_factory_returns_fake_explicit(monkeypatch):
     assert isinstance(service, FakeLLMService)
 
 
+def test_factory_returns_real_when_configured(monkeypatch):
+    monkeypatch.setenv("LLM_MODE", "real")
+    monkeypatch.setenv("LLM_API_KEY", "sk-ant-test-key-12345")
+    from app.llm.client import AnthropicLLMService
+
+    service = get_llm_service()
+    assert isinstance(service, AnthropicLLMService)
+
+
 def test_interface_exceptions():
     assert issubclass(LLMTimeout, Exception)
     assert issubclass(LLMInvalidResponse, Exception)

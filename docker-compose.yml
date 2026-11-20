@@ -1,4 +1,5 @@
-﻿services:
+﻿
+services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -6,6 +7,8 @@
       POSTGRES_USER: ${POSTGRES_USER:-safreyar}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.docker}
       POSTGRES_DB: ${POSTGRES_DB:-safreyar}
+    ports:
+      - "127.0.0.1:5433:5432"
     volumes:
       - safreyar_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,5 +30,22 @@
       db:
         condition: service_healthy
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Set PGADMIN_DEFAULT_EMAIL in .env.docker}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD in .env.docker}
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   safreyar_postgres_data:
+  pgadmin_data:
