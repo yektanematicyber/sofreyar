@@ -20,6 +20,13 @@ async def lifespan(app: FastAPI):
     # Create missing tables for local development if not already present.
     Base.metadata.create_all(bind=engine)
     yield
+    # Cleanup background services and connection pools
+    try:
+        from app.llm.factory import close_llm_service
+
+        await close_llm_service()
+    except Exception as err:
+        logger.warning("Error during LLM service shutdown: %s", err)
 
 
 app = FastAPI(

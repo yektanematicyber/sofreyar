@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diagnostic script for manual prompt review against the real Anthropic Claude API.
+"""Diagnostic script for manual prompt review against OpenRouter API.
 
 Runs 16 diverse, representative sample pantries (sparse, large, near-expiry, vegetarian,
 English aliases, single large quantities, breakfast/lunch/dinner/snack, single/multi servings)
@@ -22,7 +22,7 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.llm.client import AnthropicLLMService
+from app.llm.openrouter_client import OpenRouterLLMService
 from app.llm.config import get_llm_config
 from app.llm.fake import FakeLLMService
 from app.llm.interface import LLMService, MealType, PantryItemInput, Recipe
@@ -252,11 +252,11 @@ async def run_diagnostics(limit: int | None = None, use_fake: bool = False):
     else:
         if not config.llm_api_key or config.llm_api_key.startswith("your-"):
             print("\n❌ Error: LLM_API_KEY is not configured in .env!")
-            print("To test against the real Anthropic Claude API, set LLM_API_KEY in .env.")
+            print("To test against real OpenRouter API, set LLM_API_KEY in .env.")
             print("Alternatively, pass --fake to run against FakeLLMService.")
             sys.exit(1)
-        print(f"\n🚀 Using real Anthropic Claude API (model: {config.llm_model})")
-        service = AnthropicLLMService(config=config)
+        print(f"\n🚀 Using real OpenRouter API (model: {config.llm_model})")
+        service = OpenRouterLLMService(config=config)
 
     scenarios = SAMPLE_SCENARIOS[:limit] if limit else SAMPLE_SCENARIOS
     print(f"Testing {len(scenarios)} sample pantry scenarios...\n" + "=" * 60)

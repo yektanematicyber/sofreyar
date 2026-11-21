@@ -52,24 +52,31 @@ def test_fake_llm_service_returns_three_recipes():
 
 
 def test_factory_returns_fake_by_default(monkeypatch):
+    from app.llm.factory import reset_llm_service
+    reset_llm_service()
     monkeypatch.delenv("LLM_MODE", raising=False)
     service = get_llm_service()
     assert isinstance(service, FakeLLMService)
 
 
 def test_factory_returns_fake_explicit(monkeypatch):
+    from app.llm.factory import reset_llm_service
+    reset_llm_service()
     monkeypatch.setenv("LLM_MODE", "fake")
     service = get_llm_service()
     assert isinstance(service, FakeLLMService)
 
 
 def test_factory_returns_real_when_configured(monkeypatch):
+    from app.llm.factory import reset_llm_service
+    reset_llm_service()
     monkeypatch.setenv("LLM_MODE", "real")
-    monkeypatch.setenv("LLM_API_KEY", "sk-ant-test-key-12345")
-    from app.llm.client import AnthropicLLMService
+    monkeypatch.setenv("LLM_API_KEY", "sk-or-v1-test-key-12345")
+    from app.llm.openrouter_client import OpenRouterLLMService
 
     service = get_llm_service()
-    assert isinstance(service, AnthropicLLMService)
+    assert isinstance(service, OpenRouterLLMService)
+    reset_llm_service()
 
 
 def test_interface_exceptions():

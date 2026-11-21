@@ -67,6 +67,19 @@ def test_suggestions_empty_pantry_returns_400(client, db_session):
     assert "انبار شما خالی است" in data["detail"]
 
 
+def test_suggestions_all_expired_pantry_rejected_by_business_logic(client, db_session):
+    headers, user_id = create_user_and_token(client, email="expired_only@example.com")
+    ing = seed_ingredient(db_session, name="شیر ترش")
+    today = date.today()
+    add_pantry_item(db_session, user_id, ing.id, quantity=1.0, unit="l", expiry_date=today - timedelta(days=3))
+
+    response = client.post("/suggestions", headers=headers, json={"meal_type": "breakfast", "servings": 2})
+    assert response.status_code == 400
+    data = response.json()
+    assert data["error_code"] == "EMPTY_PANTRY"
+    assert "منقضی شده‌اند" in data["detail"]
+
+
 def test_suggestions_invalid_meal_type_rejected(client, db_session):
     headers, user_id = create_user_and_token(client, email="invalid_meal@example.com")
     ing = seed_ingredient(db_session, name="نان سنگک")
@@ -392,7 +405,7 @@ def test_suggestions_llm_provider_error_mapped_to_502(client, db_session, monkey
     add_pantry_item(db_session, user_id, ing.id, quantity=100.0, unit="ml")
 
     mock_llm = AsyncMock()
-    mock_llm.generate_recipes.side_effect = RuntimeError("Anthropic connection failed")
+    mock_llm.generate_recipes.side_effect = RuntimeError("OpenRouter connection failed")
 
     monkeypatch.setattr("app.routers.suggestions.get_llm_service", lambda: mock_llm)
 
@@ -415,14 +428,14 @@ def test_recipe_cache_model_change_invalidates_cache(db_session):
     item = PantryItem(id=1, user_id=1, ingredient_id=ing.id, quantity=1.0, unit="piece", expiry_date=today)
     item.ingredient = ing
 
-    hash_sonnet = compute_recipe_cache_hash(
-        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-sonnet-20241022", prompt_version="v1"
+    hash_gemma = compute_recipe_cache_hash(
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="google/gemma-4-26b-a4b-it:free", prompt_version="v1"
     )
-    hash_haiku = compute_recipe_cache_hash(
-        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-haiku-20241022", prompt_version="v1"
+    hash_llama = compute_recipe_cache_hash(
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="meta-llama/llama-3.3-70b-instruct:free", prompt_version="v1"
     )
 
-    assert hash_sonnet != hash_haiku
+    assert hash_gemma != hash_llama
 
 
 def test_recipe_cache_prompt_version_change_invalidates_cache(db_session):
@@ -433,10 +446,10 @@ def test_recipe_cache_prompt_version_change_invalidates_cache(db_session):
     item.ingredient = ing
 
     hash_v1 = compute_recipe_cache_hash(
-        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-sonnet", prompt_version="v1"
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="google/gemma-4-26b-a4b-it:free", prompt_version="v1"
     )
     hash_v2 = compute_recipe_cache_hash(
-        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="claude-3-5-sonnet", prompt_version="v2"
+        user_id=1, meal_type="breakfast", servings=2, pantry_items=[item], model_name="google/gemma-4-26b-a4b-it:free", prompt_version="v2"
     )
 
     assert hash_v1 != hash_v2

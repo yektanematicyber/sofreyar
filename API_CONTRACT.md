@@ -372,7 +372,7 @@ This module provides AI-driven Persian recipe generation based on the authentica
 | `400 Bad Request` | `EMPTY_PANTRY` | User pantry contains zero items | `انبار شما خالی است. لطفاً ابتدا موادی به انبار خود اضافه کنید.` |
 | `422 Unprocessable Entity` | `INVALID_REQUEST` | Unsupported meal type or non-positive servings | `داده‌های ورودی نامعتبر است.` |
 | `429 Too Many Requests` | `RATE_LIMIT_EXCEEDED` | User exceeded suggestions quota | `سقف مجاز درخواست‌های پیشنهاد غذا به پایان رسیده است.` |
-| `502 Bad Gateway` | `LLM_PROVIDER_ERROR` | Anthropic/Claude API unreachable | `خطا در برقراری ارتباط با ارائه‌دهنده هوش مصنوعی.` |
+| `502 Bad Gateway` | `LLM_PROVIDER_ERROR` | OpenRouter API unreachable | `خطا در برقراری ارتباط با ارائه‌دهنده هوش مصنوعی.` |
 | `502 Bad Gateway` | `INVALID_LLM_RESPONSE` | LLM response failed validation after retry | `پاسخ دریافتی از هوش مصنوعی ساختار معتبری نداشت.` |
 | `504 Gateway Timeout` | `LLM_TIMEOUT` | LLM call exceeded timeout threshold | `پاسخ سرویس هوش مصنوعی بیش از حد مجاز طول کشید.` |
 

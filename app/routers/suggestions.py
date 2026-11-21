@@ -1,3 +1,4 @@
+from datetime import date
 import logging
 import uuid
 
@@ -15,7 +16,15 @@ from app.exceptions import (
     LLMProviderException,
     LLMTimeoutException,
 )
-from app.llm import LLMInvalidResponse, LLMTimeout, PantryItemInput, get_llm_service
+from app.llm import (
+    LLMAuthenticationError,
+    LLMInvalidResponse,
+    LLMProviderError,
+    LLMRateLimitError,
+    LLMTimeout,
+    PantryItemInput,
+    get_llm_service,
+)
 from app.llm.telemetry import log_llm_telemetry
 from app.models import PantryItem, User
 from app.rate_limiter import suggestions_rate_limiter
@@ -68,16 +77,28 @@ async def generate_suggestions(
         logger.exception("Database error while fetching pantry items for user_id=%d: %s", current_user.id, err)
         raise DatabaseException() from err
 
-    # 3. Handle empty pantry
+    # 3. Handle empty pantry and enforce deterministic backend food safety
     if not pantry_records:
         raise EmptyPantryException()
 
-    # 4. Compute deterministic cache hash
+    today = date.today()
+    safe_pantry_records = [
+        item for item in pantry_records
+        if item.expiry_date is None or item.expiry_date >= today
+    ]
+
+    if not safe_pantry_records:
+        logger.warning("All pantry items for user_id=%d are expired; rejecting for food safety", current_user.id)
+        raise EmptyPantryException(
+            detail="تمام مواد غذایی موجود در انبار شما منقضی شده‌اند. لطفاً مواد تازه به انبار خود اضافه کنید."
+        )
+
+    # 4. Compute deterministic cache hash based on safe pantry inventory
     cache_hash = compute_recipe_cache_hash(
         user_id=current_user.id,
         meal_type=payload.meal_type,
         servings=payload.servings,
-        pantry_items=pantry_records,
+        pantry_items=safe_pantry_records,
     )
 
     # 5. Check cache in database
@@ -109,7 +130,7 @@ async def generate_suggestions(
         )
         return cached_recipes
 
-    # 6. Transform DB records to LLM input contracts
+    # 6. Transform verified safe DB records to LLM input contracts
     pantry_inputs = [
         PantryItemInput(
             name=item.ingredient.name,
@@ -117,7 +138,7 @@ async def generate_suggestions(
             unit=item.unit,
             expiry_date=item.expiry_date,
         )
-        for item in pantry_records
+        for item in safe_pantry_records
         if item.ingredient
     ]
 
@@ -136,29 +157,19 @@ async def generate_suggestions(
         )
     except LLMTimeout as err:
         logger.warning("LLM call timed out for user_id=%d: %s", current_user.id, err)
-        log_llm_telemetry(
-            user_id=current_user.id,
-            request_id=request_id,
-            model_name=model_name,
-            input_tokens=0,
-            output_tokens=0,
-            latency_ms=0.0,
-            status="timeout",
-        )
         raise LLMTimeoutException() from err
     except LLMInvalidResponse as err:
         logger.error("LLM generated invalid response for user_id=%d: %s", current_user.id, err)
-        log_llm_telemetry(
-            user_id=current_user.id,
-            request_id=request_id,
-            model_name=model_name,
-            input_tokens=0,
-            output_tokens=0,
-            latency_ms=0.0,
-            status="failed",
-            retry_required=True,
-        )
         raise InvalidLLMResponseException() from err
+    except LLMAuthenticationError as err:
+        logger.error("LLM authentication failure for user_id=%d: %s", current_user.id, err)
+        raise LLMProviderException(detail="خطا در احراز هویت سرویس هوش مصنوعی.") from err
+    except LLMRateLimitError as err:
+        logger.warning("LLM provider rate limit exceeded for user_id=%d: %s", current_user.id, err)
+        raise LLMProviderException(detail="سقف مصرف ارائه‌دهنده هوش مصنوعی به پایان رسیده است.") from err
+    except LLMProviderError as err:
+        logger.error("LLM provider error for user_id=%d: %s", current_user.id, err)
+        raise LLMProviderException() from err
     except Exception as err:
         logger.exception("Unexpected LLM provider error for user_id=%d: %s", current_user.id, err)
         log_llm_telemetry(
